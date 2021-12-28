@@ -19,11 +19,20 @@ RCT_EXPORT_METHOD(isSensorAvailable:(RCTPromiseResolveBlock)resolve rejecter:(RC
   NSError *la_error = nil;
   BOOL canEvaluatePolicy = [context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&la_error];
 
+  NSString *biometryType = [self getBiometryType:context];
+  NSString *domainState = @("");
+
+  if (context.evaluatedPolicyDomainState) {
+    domainState = [context.evaluatedPolicyDomainState base64EncodedStringWithOptions:0];
+  }
+
   if (canEvaluatePolicy) {
-    NSString *biometryType = [self getBiometryType:context];
     NSDictionary *result = @{
       @"available": @(YES),
-      @"biometryType": biometryType
+      @"biometryType": biometryType,
+      @"locked": @NO,
+      @"enrolled": @YES,
+      @"domainState": domainState
     };
 
     resolve(result);
@@ -31,7 +40,10 @@ RCT_EXPORT_METHOD(isSensorAvailable:(RCTPromiseResolveBlock)resolve rejecter:(RC
     NSString *errorMessage = [NSString stringWithFormat:@"%@", la_error];
     NSDictionary *result = @{
       @"available": @(NO),
-      @"error": errorMessage
+      @"error": errorMessage,
+      @"biometryType": biometryType,
+      @"locked": la_error.code == LAErrorBiometryLockout ? @YES : @NO,
+      @"enrolled": la_error.code == LAErrorBiometryNotEnrolled ? @NO: @YES
     };
 
     resolve(result);
@@ -178,6 +190,33 @@ RCT_EXPORT_METHOD(simplePrompt: (NSDictionary *)params resolver:(RCTPromiseResol
       } else {
         NSString *message = [NSString stringWithFormat:@"%@", biometricError];
         reject(@"biometric_error", message, nil);
+      }
+    }];
+  });
+}
+
+RCT_EXPORT_METHOD(passcodePrompt: (NSDictionary *)params resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_global_queue( DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    NSString *promptMessage = [RCTConvert NSString:params[@"promptMessage"]];
+
+    LAContext *context = [[LAContext alloc] init];
+    context.localizedFallbackTitle = @"";
+
+    [context evaluatePolicy:LAPolicyDeviceOwnerAuthentication localizedReason:promptMessage reply:^(BOOL success, NSError *error) {
+      if (success) {
+        NSDictionary *result = @{
+          @"success": @(YES)
+        };
+        resolve(result);
+      } else if (error.code == LAErrorUserCancel) {
+        NSDictionary *result = @{
+          @"success": @(NO),
+          @"error": @"User cancellation"
+        };
+        resolve(result);
+      } else {
+        NSString *message = [NSString stringWithFormat:@"%@", error];
+        reject(@"passcode_error", message, nil);
       }
     }];
   });
