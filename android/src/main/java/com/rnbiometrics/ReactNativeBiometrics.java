@@ -1,5 +1,7 @@
 package com.rnbiometrics;
 
+import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
@@ -50,40 +52,49 @@ public class ReactNativeBiometrics extends ReactContextBaseJavaModule {
     @ReactMethod
     public void isSensorAvailable(Promise promise) {
         try {
+            WritableMap resultMap = new WritableNativeMap();
+            resultMap.putString("biometryType", "Biometrics");
+            resultMap.putBoolean("available", true);
+            resultMap.putBoolean("enrolled", true);
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 ReactApplicationContext reactApplicationContext = getReactApplicationContext();
+                Context applicationContext = reactApplicationContext.getApplicationContext();
+
+                PackageManager packageManager = applicationContext.getPackageManager();
+                if (packageManager.hasSystemFeature(PackageManager.FEATURE_IRIS))
+                    resultMap.putString("biometryType", "IrisScanner");
+                if (packageManager.hasSystemFeature(PackageManager.FEATURE_FACE))
+                    resultMap.putString("biometryType", "FaceID");
+                if (packageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT))
+                    resultMap.putString("biometryType", "TouchID");
+
                 BiometricManager biometricManager = BiometricManager.from(reactApplicationContext);
                 int canAuthenticate = biometricManager.canAuthenticate();
 
-                if (canAuthenticate == BiometricManager.BIOMETRIC_SUCCESS) {
-                    WritableMap resultMap = new WritableNativeMap();
-                    resultMap.putBoolean("available", true);
-                    resultMap.putString("biometryType", "Biometrics");
-                    promise.resolve(resultMap);
-                } else {
-                    WritableMap resultMap = new WritableNativeMap();
+                if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
                     resultMap.putBoolean("available", false);
 
                     switch (canAuthenticate) {
                         case BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE:
                             resultMap.putString("error", "BIOMETRIC_ERROR_NO_HARDWARE");
+                            resultMap.putBoolean("enrolled", false);
                             break;
                         case BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE:
                             resultMap.putString("error", "BIOMETRIC_ERROR_HW_UNAVAILABLE");
+                            resultMap.putBoolean("enrolled", false);
                             break;
                         case BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED:
                             resultMap.putString("error", "BIOMETRIC_ERROR_NONE_ENROLLED");
+                            resultMap.putBoolean("enrolled", false);
                             break;
                     }
-
-                    promise.resolve(resultMap);
                 }
             } else {
-                WritableMap resultMap = new WritableNativeMap();
                 resultMap.putBoolean("available", false);
                 resultMap.putString("error", "Unsupported android version");
-                promise.resolve(resultMap);
             }
+            promise.resolve(resultMap);
         } catch (Exception e) {
             promise.reject("Error detecting biometrics availability: " + e.getMessage(), "Error detecting biometrics availability: " + e.getMessage());
         }

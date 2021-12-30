@@ -5,7 +5,7 @@ const { ReactNativeBiometrics: bridge } = NativeModules;
 /** 
  * Type alias for possible biometry types
  */
-export type BiometryType = 'TouchID' | 'FaceID' | 'Biometrics';
+export type BiometryType = 'TouchID' | 'FaceID' | 'IrisScanner' | 'Biometrics';
 
 interface IsSensorAvailableResult {
     available: boolean
@@ -47,6 +47,16 @@ interface SimplePromptResult {
     error?: string
 }
 
+interface PasscodePromptOptions {
+    promptMessage: string
+    cancelButtonText?: string
+}
+
+interface PasscodePromptResult {
+    success: boolean
+    error?: string
+}
+
 module ReactNativeBiometrics {
     /**
      * Enum for touch id sensor type
@@ -56,6 +66,10 @@ module ReactNativeBiometrics {
      * Enum for face id sensor type
      */
     export const FaceID = 'FaceID';
+    /**
+     * Enum for iris scanner
+     */
+    export const IrisScanner = 'IrisScanner';
     /**
      * Enum for generic biometrics (this is the only value available on android)
      */
@@ -128,6 +142,18 @@ module ReactNativeBiometrics {
         }
 
         return bridge.simplePrompt(simplePromptOptions);
+    }
+
+    /**
+     * Prompts user with passcode dialog (iOS only) using the passed in prompt message and
+     * returns promise that resolves to an object with object.success = true if the user passes,
+     * object.success = false if the user cancels, and rejects if anything fails
+     * @param {Object} passcodePromptOptions
+     * @param {string} passcodePromptOptions.promptMessage
+     * @returns {Promise<Object>}  Promise that resolves an object with details about the biometrics result
+     */
+    export function passcodePrompt(passcodePromptOptions: PasscodePromptOptions): Promise<PasscodePromptResult> {
+        return bridge.passcodePrompt(passcodePromptOptions);
     }
 }
 
